@@ -61,6 +61,14 @@ db.runCommand({enablesharding:"baizhi"});
 设置库的片键信息
 db.runCommand({shardcollection:"baizhi.emps",key:{_id:"hashed"}})
 
-切用户分片测试
+主节点切用户分片测试
 use baizhi
 for(let i=0;i<1000;i++){db.emps.insert({_id:i,name:'xxx'})};
+
+从节点确认从属关系
+use baizhi
+rs.secondaryOk()
+
+从节点查询分片情况
+rs.emps.conut()
+rs.emps.find()
