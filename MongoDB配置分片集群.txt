@@ -1,0 +1,66 @@
+创建数据目录
+mkdir -p ../cluster/shard/s0
+mkdir -p ../cluster/shard/s0-repl
+mkdir -p ../cluster/shard/s1
+mkdir -p ../cluster/shard/s1-repl
+mkdir -p ../cluster/shard/s2
+mkdir -p ../cluster/shard/s2-repl
+mkdir -p ../cluster/shard/config1
+mkdir -p ../cluster/shard/config2
+mkdir -p ../cluster/shard/config3
+ls ../cluster/shard
+
+启动shard服务s0、r0
+./mongod --port 27017 --dbpath ../cluster/shard/s0 --bind_ip 0.0.0.0 --shardsvr --replSet r0/localhost:27018
+./mongod --port 27018 --dbpath ../cluster/shard/s0-repl --bind_ip 0.0.0.0 --shardsvr --replSet r0/localhost:27017
+mongo --port 27017
+use admin
+config={_id:"r0",members:[{_id:0,host:"localhost:27017"},{_id:1,host:"localhost:27018"}]}
+rs.initiate(config)
+
+启动shard服务s1、r1
+./mongod --port 27019 --dbpath ../cluster/shard/s1 --bind_ip 0.0.0.0 --shardsvr --replSet r1/localhost:27020
+./mongod --port 27020 --dbpath ../cluster/shard/s1-repl --bind_ip 0.0.0.0 --shardsvr --replSet r1/localhost:27019
+mongo --port 27019
+use admin
+config={_id:"r1",members:[{_id:0,host:"localhost:27019"},{_id:1,host:"localhost:27020"}]}
+rs.initiate(config)
+
+启动shard服务s2、r2
+./mongod --port 27021 --dbpath ../cluster/shard/s2 --bind_ip 0.0.0.0 --shardsvr --replSet r2/localhost:27022
+./mongod --port 27022 --dbpath ../cluster/shard/s2-repl --bind_ip 0.0.0.0 --shardsvr --replSet r2/localhost:27021
+mongo --port 27021
+use admin
+config={_id:"r2",members:[{_id:0,host:"localhost:27021"},{_id:1,host:"localhost:27022"}]}
+rs.initiate(config)
+
+启动三个config服务
+./mongod --port 27023 --dbpath ../cluster/shard/config1 --bind_ip 0.0.0.0 --replSet config/[localhost:27024,localhost:27025] --configsvr
+./mongod --port 27024 --dbpath ../cluster/shard/config2 --bind_ip 0.0.0.0 --replSet config/[localhost:27023,localhost:27025] --configsvr
+./mongod --port 27025 --dbpath ../cluster/shard/config3 --bind_ip 0.0.0.0 --replSet config/[localhost:27023,localhost:27024] --configsvr
+mongo --port 27023
+use admin
+config={_id:"config",configsvr:true,members:[{_id:0,host:"localhost:27023"},{_id:1,host:"localhost:27024"},{_id:2,host:"localhost:27025"}]}
+rs.initiate(config)
+
+启动momgos路由服务
+./mongos --port 27027 --configdb config/localhost:27023,localhost:27024,localhost:27025 --bind_ip 0.0.0.0
+mongo --port 27027
+use admin
+
+添加分片信息
+db.runCommand({addshard:"r0/localhost:27017,localhost:27018","allowLocal":true});
+
+db.runCommand({addshard:"r1/localhost:27019,localhost:27020","allowLocal":true});
+
+db.runCommand({addshard:"r2/localhost:27021,localhost:27022","allowLocal":true});
+
+指定分片数据库
+db.runCommand({enablesharding:"baizhi"});
+
+设置库的片键信息
+db.runCommand({shardcollection:"baizhi.emps",key:{_id:"hashed"}})
+
+切用户分片测试
+use baizhi
+for(let i=0;i<1000;i++){db.emps.insert({_id:i,name:'xxx'})};
